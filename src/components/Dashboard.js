@@ -17,15 +17,18 @@ export class Dashboard {
     this._distanceValue = document.getElementById('distance-value');
     this._distanceUnit = document.getElementById('distance-unit');
     this._distanceBar = document.getElementById('distance-bar');
+    this._destinationName = document.getElementById('destination-name');
     this._destinationCoords = document.getElementById('destination-coords');
     this._alertRadiusDisplay = document.getElementById('alert-radius-display');
     this._btnStartStop = document.getElementById('btn-start-stop');
     this._btnIconPlay = document.getElementById('btn-icon-play');
     this._btnIconStop = document.getElementById('btn-icon-stop');
     this._btnText = document.getElementById('btn-text');
+    this._btnSaveFav = document.getElementById('btn-save-favorite');
 
     // 콜백
     this._onStartStop = null;
+    this._onSaveFavorite = null;
 
     this._isTracking = false;
     this._hasDestination = false;
@@ -37,6 +40,11 @@ export class Dashboard {
     this._btnStartStop.addEventListener('click', () => {
       this._onStartStop?.();
     });
+    if (this._btnSaveFav) {
+      this._btnSaveFav.addEventListener('click', () => {
+        this._onSaveFavorite?.();
+      });
+    }
   }
 
   /**
@@ -45,6 +53,14 @@ export class Dashboard {
   onStartStop(callback) {
     this._onStartStop = callback;
   }
+
+  /**
+   * 즐겨찾기 저장 버튼 콜백
+   */
+  onSaveFavorite(callback) {
+    this._onSaveFavorite = callback;
+  }
+
 
   /**
    * 상태 업데이트
@@ -66,8 +82,8 @@ export class Dashboard {
       this._accuracyText.textContent = 'GPS 대기중';
       return;
     }
-    const icon = accuracy < 20 ? '🟢' : accuracy < 50 ? '🟡' : '🔴';
-    this._accuracyText.textContent = `${icon} 정확도 ±${Math.round(accuracy)}m`;
+    const level = accuracy < 20 ? '●' : accuracy < 50 ? '◑' : '○';
+    this._accuracyText.textContent = `${level} 정확도 ±${Math.round(accuracy)}m`;
   }
 
   /**
@@ -106,24 +122,50 @@ export class Dashboard {
 
   /**
    * 목적지 좌표 표시
-   * @param {{ lat: number, lng: number }|null} destination
+   * @param {{ lat: number, lng: number, displayName?: string }|null} destination
    * @param {number} radius - 알림 반경 (미터)
    */
   setDestination(destination, radius) {
     this._hasDestination = !!destination;
 
     if (destination) {
-      this._destinationCoords.textContent =
-        `${destination.lat.toFixed(5)}, ${destination.lng.toFixed(5)}`;
-      this._alertRadiusDisplay.textContent =
-        radius >= 1000 ? `반경 ${radius / 1000}km` : `반경 ${radius}m`;
+      if (destination.displayName && this._destinationName) {
+        this._destinationName.textContent = destination.displayName;
+        this._destinationName.style.display = 'block';
+      } else if (this._destinationName) {
+        this._destinationName.style.display = 'none';
+      }
+      if (this._destinationCoords) {
+        this._destinationCoords.textContent =
+          `${destination.lat.toFixed(5)}, ${destination.lng.toFixed(5)}`;
+      }
+      if (this._alertRadiusDisplay) {
+        this._alertRadiusDisplay.textContent =
+          radius >= 1000 ? `반경 ${radius / 1000}km` : `반경 ${radius}m`;
+      }
+      this._btnSaveFav?.classList.remove('hidden');
     } else {
-      this._destinationCoords.textContent = '설정되지 않음';
-      this._alertRadiusDisplay.textContent = '';
+      if (this._destinationName) this._destinationName.style.display = 'none';
+      if (this._destinationCoords) this._destinationCoords.textContent = '설정되지 않음';
+      if (this._alertRadiusDisplay) this._alertRadiusDisplay.textContent = '';
+      this._btnSaveFav?.classList.add('hidden');
+      this._btnSaveFav?.classList.remove('saved');
     }
 
     this._updateStartButton();
   }
+
+  /**
+   * 즐겨찾기 저장 버튼 상태 업데이트
+   */
+  setSaveFavoriteState(isSaved) {
+    if (isSaved) {
+      this._btnSaveFav?.classList.add('saved');
+    } else {
+      this._btnSaveFav?.classList.remove('saved');
+    }
+  }
+
 
   /**
    * 추적 상태에 따른 버튼 업데이트
