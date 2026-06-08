@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Temp files
+*.log
+gh_payload.json
+create_repo.ps1
+response.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Vite cache
+.vite/
