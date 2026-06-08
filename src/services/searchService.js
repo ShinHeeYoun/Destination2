@@ -1,157 +1,160 @@
 // ===================================================
-// searchService.js - Nominatim 지오코딩 서비스
+// searchService.js - 카카오 로컬 API 지오코딩 서비스
 //
-// OpenStreetMap Nominatim API를 사용하여 주소를 검색합니다.
-// 네이버/카카오 API 키 없이 동작하며, 한국어 주소 검색을 지원합니다.
+// 카카오 로컬 REST API를 사용하여 한국어 주소 및 장소명을 검색합니다.
+// - 키워드 검색: 건물명, 상호명, 아파트명 등 POI 검색
+// - 주소 검색: 도로명 주소, 지번 주소 검색
+// 두 검색을 병렬로 실행하여 결과를 병합합니다.
+//
 // 추후 다른 지오코딩 API로 교체 시 이 파일만 수정하면 됩니다.
 // ===================================================
 
-const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
+const KAKAO_BASE = 'https://dapi.kakao.com/v2/local';
+const API_KEY = '82c098ef653139acc627f27a8a03d328';
+
+const HEADERS = { Authorization: `KakaoAK ${API_KEY}` };
 
 /**
- * 검색 결과 항목을 사람이 읽기 좋은 형태로 변환
- * @param {object} item - Nominatim 응답 항목
- * @returns {{ primaryName: string, secondaryName: string }}
+ * @typedef {object} SearchResult
+ * @property {string}  id
+ * @property {string}  primaryName   - 표시용 주 이름 (장소명 or 주소)
+ * @property {string}  secondaryName - 보조 정보 (주소, 카테고리 등)
+ * @property {string}  fullAddress   - 전체 주소 문자열
+ * @property {number}  lat
+ * @property {number}  lng
+ * @property {'keyword'|'address'} type
  */
-function formatResult(item) {
-  const addr = item.address || {};
 
-  // 1차 이름: 시설명 > 도로명 > 지역명
-  const primary =
-    addr.amenity ||
-    addr.shop ||
-    addr.tourism ||
-    addr.leisure ||
-    addr.building ||
-    addr.office ||
-    item.namedetails?.name ||
-    addr.road ||
-    addr.neighbourhood ||
-    addr.suburb ||
-    (item.display_name?.split(',')[0]?.trim()) ||
-    '알 수 없는 장소';
-
-  // 2차 이름: 시/군/구 + 도/시 조합
-  const district = addr.neighbourhood || addr.suburb || addr.quarter || '';
-  const city =
-    addr.city ||
-    addr.county ||
-    addr.town ||
-    addr.village ||
-    addr.state_district ||
-    '';
-  const province = addr.province || addr.state || '';
-
-  const parts = [district, city, province].filter(Boolean);
-  const secondary = parts.slice(0, 2).join(' ') || item.display_name?.split(',').slice(1, 3).join(',').trim() || '';
-
-  return { primaryName: primary, secondaryName: secondary };
-}
-
-/**
- * SearchService - 주소 검색 및 역지오코딩
- */
 export class SearchService {
   constructor() {
     this._debounceTimer = null;
     this._debounceMs = 350;
-    this._abortController = null;
   }
 
   /**
-   * 키워드로 주소 검색
-   * @param {string} query - 검색어 (한국어 주소, 건물명, 지역명 등)
+   * 키워드 또는 주소로 장소 검색
+   * 키워드 검색과 주소 검색을 병렬 실행 후 병합합니다.
+   * @param {string} query
    * @returns {Promise<SearchResult[]>}
    */
   async search(query) {
     const trimmed = query?.trim();
-    if (!trimmed || trimmed.length < 2) return [];
+    if (!trimmed || trimmed.length < 1) return [];
 
-    // 이전 요청 취소
-    if (this._abortController) {
-      this._abortController.abort();
+    // 두 검색을 병렬 실행 — 어느 한쪽이 실패해도 나머지 결과를 사용
+    const [keywordResult, addressResult] = await Promise.allSettled([
+      this._keywordSearch(trimmed),
+      this._addressSearch(trimmed),
+    ]);
+
+    const keyword = keywordResult.status === 'fulfilled' ? keywordResult.value : [];
+    const address = addressResult.status === 'fulfilled' ? addressResult.value : [];
+
+    // 병합: 주소 결과 우선 배치, 키워드 결과에서 중복 좌표 제거
+    const merged = [...address];
+    for (const kw of keyword) {
+      const isDup = merged.some(
+        (m) => Math.abs(m.lat - kw.lat) < 0.0001 && Math.abs(m.lng - kw.lng) < 0.0001
+      );
+      if (!isDup) merged.push(kw);
     }
-    this._abortController = new AbortController();
 
-    const params = new URLSearchParams({
-      q: trimmed,
-      format: 'json',
-      limit: 7,
-      countrycodes: 'kr',
-      addressdetails: 1,
-      namedetails: 1,
-      'accept-language': 'ko',
-    });
-
-    const url = `${NOMINATIM_BASE}/search?${params}`;
-
-    try {
-      const res = await fetch(url, {
-        signal: this._abortController.signal,
-        headers: { Accept: 'application/json' },
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data = await res.json();
-
-      return data.map((item) => {
-        const { primaryName, secondaryName } = formatResult(item);
-        return {
-          id: item.place_id,
-          primaryName,
-          secondaryName,
-          fullAddress: item.display_name,
-          lat: parseFloat(item.lat),
-          lng: parseFloat(item.lon),
-          type: item.type,
-          importance: item.importance,
-        };
-      });
-    } catch (err) {
-      if (err.name === 'AbortError') return [];
-      console.error('[SearchService] Search failed:', err);
-      throw err;
-    }
+    return merged.slice(0, 8);
   }
 
   /**
-   * 좌표로 주소 역지오코딩
+   * 좌표 → 주소 역지오코딩
    * @param {number} lat
    * @param {number} lng
-   * @returns {Promise<string>} 주소 문자열
+   * @returns {Promise<string>}
    */
   async reverseGeocode(lat, lng) {
-    const params = new URLSearchParams({
-      lat,
-      lon: lng,
-      format: 'json',
-      addressdetails: 1,
-      'accept-language': 'ko',
-    });
-
+    const params = new URLSearchParams({ x: lng, y: lat, input_coord: 'WGS84' });
     try {
-      const res = await fetch(`${NOMINATIM_BASE}/reverse?${params}`, {
-        headers: { Accept: 'application/json' },
+      const res = await fetch(`${KAKAO_BASE}/geo/coord2address.json?${params}`, {
+        headers: HEADERS,
       });
       const data = await res.json();
-      const { primaryName, secondaryName } = formatResult(data);
-      return secondaryName ? `${primaryName}, ${secondaryName}` : primaryName;
-    } catch {
-      return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    }
+      const doc = data.documents?.[0];
+      if (doc?.road_address?.address_name) return doc.road_address.address_name;
+      if (doc?.address?.address_name) return doc.address.address_name;
+    } catch {}
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
   }
 
   /**
-   * 디바운스 래퍼 - 연속 입력 시 마지막 입력만 실행
-   * @param {Function} fn
-   * @returns {Function}
+   * 디바운스 래퍼
    */
   debounce(fn) {
     return (...args) => {
       clearTimeout(this._debounceTimer);
       this._debounceTimer = setTimeout(() => fn(...args), this._debounceMs);
     };
+  }
+
+  // ── Private ─────────────────────────────────────
+
+  /**
+   * 카카오 키워드 검색 — 장소명, 건물명, 아파트명, 상호 등
+   * @param {string} query
+   * @returns {Promise<SearchResult[]>}
+   */
+  async _keywordSearch(query) {
+    const params = new URLSearchParams({ query, size: 7 });
+    const res = await fetch(`${KAKAO_BASE}/search/keyword.json?${params}`, {
+      headers: HEADERS,
+    });
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    return (data.documents || []).map((doc) => ({
+      id: `kw_${doc.id}`,
+      primaryName: doc.place_name,
+      secondaryName: this._buildSecondary(doc),
+      fullAddress: doc.road_address_name || doc.address_name || doc.place_name,
+      lat: parseFloat(doc.y),
+      lng: parseFloat(doc.x),
+      type: 'keyword',
+    }));
+  }
+
+  /**
+   * 카카오 주소 검색 — 도로명/지번 주소 직접 검색
+   * @param {string} query
+   * @returns {Promise<SearchResult[]>}
+   */
+  async _addressSearch(query) {
+    const params = new URLSearchParams({ query, size: 5 });
+    const res = await fetch(`${KAKAO_BASE}/search/address.json?${params}`, {
+      headers: HEADERS,
+    });
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    return (data.documents || []).map((doc) => {
+      const roadName = doc.road_address?.address_name || '';
+      const jibunName = doc.address?.address_name || '';
+      return {
+        id: `addr_${doc.address_name}`,
+        primaryName: roadName || jibunName,
+        secondaryName: roadName && jibunName && roadName !== jibunName ? jibunName : '',
+        fullAddress: roadName || jibunName,
+        lat: parseFloat(doc.y),
+        lng: parseFloat(doc.x),
+        type: 'address',
+      };
+    });
+  }
+
+  /**
+   * 카카오 키워드 결과에서 부가 정보 문자열 조합
+   */
+  _buildSecondary(doc) {
+    const parts = [];
+    if (doc.category_group_name) parts.push(doc.category_group_name);
+    if (doc.road_address_name) parts.push(doc.road_address_name);
+    else if (doc.address_name) parts.push(doc.address_name);
+    return parts.join(' · ');
   }
 }
 

@@ -10,6 +10,7 @@ import { FavoritesPanel } from './components/FavoritesPanel.js';
 import { locationService } from './services/locationService.js';
 import { notificationService } from './services/notificationService.js';
 import { favoritesService } from './services/favoritesService.js';
+import { searchService } from './services/searchService.js';
 
 /**
  * App 클래스 - 모든 컴포넌트와 서비스를 조율합니다.
@@ -87,9 +88,18 @@ class App {
   // ── 지도 이벤트 ──────────────────────────────────
 
   _bindMapEvents() {
-    // 지도 클릭 → 목적지 설정 (주소 이름 없이 좌표만)
-    mapComponent.onMapClick(({ lat, lng }) => {
+    // 지도 클릭 → 좌표 역지오코딩 후 목적지 설정
+    mapComponent.onMapClick(async ({ lat, lng }) => {
+      // 일단 좌표만 즉시 설정 (반응성 확보)
       this._setDestination({ lat, lng });
+      // 역지오코딩으로 주소명 보완
+      try {
+        const name = await searchService.reverseGeocode(lat, lng);
+        if (this._destination && this._destination.lat === lat && this._destination.lng === lng) {
+          this._destination.displayName = name;
+          this._dashboard.setDestination(this._destination, this._settingsPanel.radius);
+        }
+      } catch {}
     });
 
     // 마커 드래그 → 목적지 변경
