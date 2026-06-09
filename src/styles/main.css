@@ -27,6 +27,13 @@
   --color-danger-glow: rgba(239, 68, 68, 0.25);
   --color-info: #38bdf8;
 
+  /* 테마별 색상 - violet(기본) */
+  --theme-primary:       #6c63ff;
+  --theme-primary-light: #8b84ff;
+  --theme-primary-dark:  #4f46e5;
+  --theme-primary-glow:  rgba(108, 99, 255, 0.3);
+  --theme-border-active: rgba(108, 99, 255, 0.5);
+
   /* 텍스트 */
   --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
@@ -563,6 +570,60 @@ html, body {
   letter-spacing: 0.1em;
   color: var(--text-muted);
   padding-top: var(--space-xs);
+}
+
+/* 콜랩스 가능한 헤더 버튼 */
+button.section-title.section-toggle {
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  justify-content: space-between;
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-sm);
+  margin: calc(-1 * var(--space-sm));
+  transition: background var(--transition-fast);
+}
+
+button.section-title.section-toggle:hover {
+  background: var(--color-surface-2);
+}
+
+.section-title-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.settings-chevron {
+  transition: transform var(--transition-normal);
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+button.section-toggle[aria-expanded="true"] .settings-chevron {
+  transform: rotate(180deg);
+}
+
+/* 설정 콘텐츠 애니메이션 */
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s ease,
+              margin-top 0.3s ease;
+  max-height: 800px;
+  opacity: 1;
+  margin-top: var(--space-lg);
+}
+
+.settings-body.collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+  pointer-events: none;
 }
 
 .setting-group {
@@ -1214,10 +1275,17 @@ html, body {
   font-size: 14px;
   font-weight: 500;
   color: var(--text-primary);
+  line-height: 1.5;
+  word-break: keep-all;
+  white-space: normal;
   margin-bottom: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.destination-name:empty::before,
+.destination-name.placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-style: italic;
 }
 
 .save-fav-btn {
@@ -1606,3 +1674,105 @@ html, body {
   width: auto;
 }
 
+/* ================================================
+   색 테마 스와치
+   ================================================ */
+.theme-grid {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.theme-swatch {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--sw, #6c63ff);
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast),
+              box-shadow var(--transition-fast);
+  outline: none;
+  padding: 0;
+}
+
+.theme-swatch:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
+}
+
+.theme-swatch.active {
+  border-color: #fff;
+  box-shadow: 0 0 0 3px var(--sw, #6c63ff);
+  transform: scale(1.1);
+}
+
+/* 체크 표시 */
+.theme-swatch.active span::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E") center/60% no-repeat;
+}
+
+/* ================================================
+   색 테마 변수 정의
+   ================================================ */
+
+/* Violet (기본) */
+[data-theme="violet"] {
+  --color-primary:       #6c63ff;
+  --color-primary-light: #8b84ff;
+  --color-primary-dark:  #4f46e5;
+  --color-primary-glow:  rgba(108, 99, 255, 0.3);
+  --color-border-active: rgba(108, 99, 255, 0.5);
+}
+
+/* Ocean */
+[data-theme="ocean"] {
+  --color-primary:       #0ea5e9;
+  --color-primary-light: #38bdf8;
+  --color-primary-dark:  #0284c7;
+  --color-primary-glow:  rgba(14, 165, 233, 0.3);
+  --color-border-active: rgba(14, 165, 233, 0.5);
+}
+
+/* Emerald */
+[data-theme="emerald"] {
+  --color-primary:       #10b981;
+  --color-primary-light: #34d399;
+  --color-primary-dark:  #059669;
+  --color-primary-glow:  rgba(16, 185, 129, 0.3);
+  --color-border-active: rgba(16, 185, 129, 0.5);
+}
+
+/* Rose */
+[data-theme="rose"] {
+  --color-primary:       #f43f5e;
+  --color-primary-light: #fb7185;
+  --color-primary-dark:  #e11d48;
+  --color-primary-glow:  rgba(244, 63, 94, 0.3);
+  --color-border-active: rgba(244, 63, 94, 0.5);
+}
+
+/* Amber */
+[data-theme="amber"] {
+  --color-primary:       #f59e0b;
+  --color-primary-light: #fbbf24;
+  --color-primary-dark:  #d97706;
+  --color-primary-glow:  rgba(245, 158, 11, 0.3);
+  --color-border-active: rgba(245, 158, 11, 0.5);
+}
+
+/* Slate */
+[data-theme="slate"] {
+  --color-primary:       #64748b;
+  --color-primary-light: #94a3b8;
+  --color-primary-dark:  #475569;
+  --color-primary-glow:  rgba(100, 116, 139, 0.3);
+  --color-border-active: rgba(100, 116, 139, 0.5);
+}

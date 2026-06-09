@@ -18,7 +18,6 @@ export class Dashboard {
     this._distanceUnit = document.getElementById('distance-unit');
     this._distanceBar = document.getElementById('distance-bar');
     this._destinationName = document.getElementById('destination-name');
-    this._destinationCoords = document.getElementById('destination-coords');
     this._alertRadiusDisplay = document.getElementById('alert-radius-display');
     this._btnStartStop = document.getElementById('btn-start-stop');
     this._btnIconPlay = document.getElementById('btn-icon-play');
@@ -129,15 +128,10 @@ export class Dashboard {
     this._hasDestination = !!destination;
 
     if (destination) {
-      if (destination.displayName && this._destinationName) {
-        this._destinationName.textContent = destination.displayName;
-        this._destinationName.style.display = 'block';
-      } else if (this._destinationName) {
-        this._destinationName.style.display = 'none';
-      }
-      if (this._destinationCoords) {
-        this._destinationCoords.textContent =
-          `${destination.lat.toFixed(5)}, ${destination.lng.toFixed(5)}`;
+      if (this._destinationName) {
+        this._destinationName.textContent =
+          destination.displayName || `${destination.lat.toFixed(4)}, ${destination.lng.toFixed(4)}`;
+        this._destinationName.classList.remove('placeholder');
       }
       if (this._alertRadiusDisplay) {
         this._alertRadiusDisplay.textContent =
@@ -145,8 +139,10 @@ export class Dashboard {
       }
       this._btnSaveFav?.classList.remove('hidden');
     } else {
-      if (this._destinationName) this._destinationName.style.display = 'none';
-      if (this._destinationCoords) this._destinationCoords.textContent = '설정되지 않음';
+      if (this._destinationName) {
+        this._destinationName.textContent = '지도에서 선택하거나 검색하세요';
+        this._destinationName.classList.add('placeholder');
+      }
       if (this._alertRadiusDisplay) this._alertRadiusDisplay.textContent = '';
       this._btnSaveFav?.classList.add('hidden');
       this._btnSaveFav?.classList.remove('saved');

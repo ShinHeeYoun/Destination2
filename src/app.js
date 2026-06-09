@@ -76,7 +76,13 @@ class App {
     // 8. 패널 드래그 초기화
     this._initPanelDrag();
 
-    // 9. 로딩 화면 제거
+    // 9. 설정 패널 접기/펼치기
+    this._initSettingsCollapse();
+
+    // 10. 색 테마 초기화
+    this._initTheme();
+
+    // 11. 로딩 화면 제거
     setTimeout(() => {
       const loadingScreen = document.getElementById('loading-screen');
       loadingScreen?.classList.add('hidden');
@@ -374,6 +380,46 @@ class App {
     if (!btn) return;
     const count = favoritesService.getAll().length;
     btn.classList.toggle('has-favorites', count > 0);
+  }
+
+  // ── 설정 접기/펼치기 ─────────────────────────────
+
+  _initSettingsCollapse() {
+    const btn = document.getElementById('settings-toggle');
+    const body = document.getElementById('settings-body');
+    if (!btn || !body) return;
+
+    btn.addEventListener('click', () => {
+      const expanded = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!expanded));
+      body.classList.toggle('collapsed', expanded);
+    });
+  }
+
+  // ── 색 테마 ──────────────────────────────────────
+
+  _initTheme() {
+    const saved = localStorage.getItem('app-theme') || 'violet';
+    this._applyTheme(saved);
+
+    const swatches = document.querySelectorAll('.theme-swatch');
+    swatches.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const theme = btn.dataset.theme;
+        this._applyTheme(theme);
+        localStorage.setItem('app-theme', theme);
+        swatches.forEach((s) => s.classList.toggle('active', s.dataset.theme === theme));
+      });
+    });
+  }
+
+  _applyTheme(theme) {
+    // data-theme 속성을 html 루트에 적용
+    document.documentElement.setAttribute('data-theme', theme);
+    // 활성 스와치 표시
+    document.querySelectorAll('.theme-swatch').forEach((s) => {
+      s.classList.toggle('active', s.dataset.theme === theme);
+    });
   }
 
 
