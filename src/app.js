@@ -97,6 +97,10 @@ class App {
   _bindMapEvents() {
     // 지도 클릭 → 좌표 역지오코딩 후 목적지 설정
     mapComponent.onMapClick(async ({ lat, lng }) => {
+      if (this._isTracking) {
+        this._showToast('위치 추적 중에는 목적지를 변경할 수 없습니다');
+        return;
+      }
       // 일단 좌표만 즉시 설정 (반응성 확보)
       this._setDestination({ lat, lng });
       // 역지오코딩으로 주소명 보완
@@ -111,6 +115,7 @@ class App {
 
     // 마커 드래그 → 목적지 변경
     mapComponent.onDestinationChange(({ lat, lng }) => {
+      if (this._isTracking) return; // 드래그도 잠금
       const updated = { ...this._destination, lat, lng };
       this._destination = updated;
       locationService.setDestination(lat, lng);
@@ -124,6 +129,10 @@ class App {
 
     // 목적지 초기화 버튼
     document.getElementById('btn-clear-destination').addEventListener('click', () => {
+      if (this._isTracking) {
+        this._showToast('위치 추적 중에는 목적지를 지울 수 없습니다');
+        return;
+      }
       this._clearDestination();
     });
   }
@@ -132,6 +141,10 @@ class App {
 
   _bindSearchEvents() {
     this._searchComponent.onSelect(({ lat, lng, displayName, address }) => {
+      if (this._isTracking) {
+        this._showToast('위치 추적 중에는 목적지를 변경할 수 없습니다');
+        return;
+      }
       this._setDestination({ lat, lng, displayName, address });
     });
   }
@@ -141,6 +154,10 @@ class App {
   _bindFavoritesEvents() {
     // 즐겨찾기 항목 선택 → 목적지 설정
     this._favoritesPanel.onSelect((fav) => {
+      if (this._isTracking) {
+        this._showToast('위치 추적 중에는 목적지를 변경할 수 없습니다');
+        return;
+      }
       this._setDestination({
         lat: fav.lat,
         lng: fav.lng,
@@ -400,6 +417,28 @@ class App {
 
   _hideArrivalOverlay() {
     document.getElementById('arrival-overlay').classList.add('hidden');
+  }
+
+  // ── 토스트 알림 ──────────────────────────────────
+
+  _showToast(message, duration = 2200) {
+    // 기존 토스트 제거
+    document.getElementById('app-toast')?.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'app-toast';
+    toast.className = 'app-toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    // 페이드인
+    requestAnimationFrame(() => toast.classList.add('visible'));
+
+    // 자동 제거
+    setTimeout(() => {
+      toast.classList.remove('visible');
+      setTimeout(() => toast.remove(), 350);
+    }, duration);
   }
 
   // ── 알림 권한 ────────────────────────────────────
