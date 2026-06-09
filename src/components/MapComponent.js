@@ -39,6 +39,9 @@ export class MapComponent {
     this._alertRadius = 500;
     this._onMapClickCallback = null;
     this._onDestinationChangeCallback = null;
+
+    // 이동 경로 레이어
+    this._routeLayers = []; // L.Polyline[]
   }
 
   /**
@@ -256,6 +259,46 @@ export class MapComponent {
   }
 
   // ── Private ─────────────────────────────────────
+
+  /**
+   * 이동 경로 그리기
+   * @param {Array<{points:[number,number][], isDashed:boolean}>} segments
+   */
+  drawRoute(segments) {
+    // 기존 경로 레이어 제거
+    this._routeLayers.forEach((l) => this._map.removeLayer(l));
+    this._routeLayers = [];
+
+    const primaryColor =
+      getComputedStyle(document.documentElement)
+        .getPropertyValue('--color-primary')
+        .trim() || '#6c63ff';
+
+    segments.forEach(({ points, isDashed }) => {
+      if (points.length < 2) return;
+
+      const polyline = L.polyline(points, {
+        color: primaryColor,
+        weight: isDashed ? 3 : 4,
+        opacity: isDashed ? 0.55 : 0.85,
+        dashArray: isDashed ? '10 8' : null,
+        lineCap: 'round',
+        lineJoin: 'round',
+        interactive: false,
+        className: isDashed ? 'route-gap' : 'route-solid',
+      }).addTo(this._map);
+
+      this._routeLayers.push(polyline);
+    });
+  }
+
+  /**
+   * 이동 경로 전체 삭제
+   */
+  clearRoute() {
+    this._routeLayers.forEach((l) => this._map.removeLayer(l));
+    this._routeLayers = [];
+  }
 
   _updateRadiusCircle(lat, lng) {
     if (!this._alertRadiusCircle) {

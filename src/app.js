@@ -11,6 +11,7 @@ import { locationService } from './services/locationService.js';
 import { notificationService } from './services/notificationService.js';
 import { favoritesService } from './services/favoritesService.js';
 import { searchService } from './services/searchService.js';
+import { trackingService } from './services/trackingService.js';
 
 /**
  * App 클래스 - 모든 컴포넌트와 서비스를 조율합니다.
@@ -171,6 +172,13 @@ class App {
       if (distance !== null) {
         this._dashboard.setDistance(distance, distancePercent);
       }
+
+      // 추적 중일 때만 경로 기록
+      if (this._isTracking) {
+        trackingService.addPoint(position.lat, position.lng);
+        mapComponent.drawRoute(trackingService.getSegments());
+        this._updateTraveledDisplay(trackingService.totalDistance);
+      }
     });
 
     locationService.onArrival(async (data) => {
@@ -272,6 +280,11 @@ class App {
     this._dashboard.setTracking(true);
     this._dashboard.setStatus('tracking', '위치 추적중');
 
+    // 새 추적 시작 시 경로 초기화
+    trackingService.reset();
+    mapComponent.clearRoute();
+    this._updateTraveledDisplay(0);
+
     const panel = document.getElementById('bottom-panel');
     panel.classList.remove('expanded');
   }
@@ -283,6 +296,29 @@ class App {
     this._dashboard.setStatus('idle', '추적 대기중');
     this._dashboard.setDistance(null);
     this._dashboard.setAccuracy(null);
+    // 경로는 화면에 유지 (이동 기록 확인용)
+  }
+
+  // ── 이동 거리 표시 ──────────────────────────────
+
+  _updateTraveledDisplay(meters) {
+    const valueEl = document.getElementById('traveled-value');
+    const unitEl = document.getElementById('traveled-unit');
+    if (!valueEl || !unitEl) return;
+
+    if (meters === null || meters === undefined) {
+      valueEl.textContent = '--';
+      unitEl.textContent = 'm';
+      return;
+    }
+
+    if (meters >= 1000) {
+      valueEl.textContent = (meters / 1000).toFixed(2);
+      unitEl.textContent = 'km';
+    } else {
+      valueEl.textContent = Math.round(meters);
+      unitEl.textContent = 'm';
+    }
   }
 
   // ── 목적지 관리 ──────────────────────────────────
