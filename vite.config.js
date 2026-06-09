@@ -19,9 +19,9 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        // 청크 분할 최적화
-        manualChunks: {
-          leaflet: ['leaflet'],
+        // Vite 8(rolldown)은 manualChunks를 Function 형태로만 허용
+        manualChunks(id) {
+          if (id.includes('node_modules/leaflet')) return 'leaflet';
         },
       },
     },
